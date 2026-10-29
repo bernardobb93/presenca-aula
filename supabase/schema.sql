@@ -1,0 +1,11 @@
+create extension if not exists pgcrypto;
+create table if not exists public.classes (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, name text not null, subject text not null, teacher text, created_at timestamptz default now());
+create table if not exists public.students (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, class_id uuid not null references public.classes(id) on delete cascade, name text not null, registration text, email text, phone text, birth_date date, created_at timestamptz default now());
+create table if not exists public.lessons (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade, class_id uuid not null references public.classes(id) on delete cascade, date timestamptz not null, title text not null, notes text, attachment_name text, created_at timestamptz default now());
+create table if not exists public.attendance (lesson_id uuid primary key references public.lessons(id) on delete cascade, user_id uuid not null references auth.users(id) on delete cascade, items jsonb not null default '[]'::jsonb, created_at timestamptz default now(), updated_at timestamptz default now());
+alter table public.classes enable row level security; alter table public.students enable row level security; alter table public.lessons enable row level security; alter table public.attendance enable row level security;
+drop policy if exists classes_owner on public.classes; create policy classes_owner on public.classes for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+drop policy if exists students_owner on public.students; create policy students_owner on public.students for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+drop policy if exists lessons_owner on public.lessons; create policy lessons_owner on public.lessons for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+drop policy if exists attendance_owner on public.attendance; create policy attendance_owner on public.attendance for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+alter publication supabase_realtime add table public.classes, public.students, public.lessons, public.attendance;

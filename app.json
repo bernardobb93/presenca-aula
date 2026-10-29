@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Presença & Aula",
+    "slug": "presenca-aula",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "presencaaula",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.presencaaula.app"
+    },
+    "android": {
+      "package": "br.com.presencaaula.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F766E"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-document-picker"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "613fa6f6-8147-422b-abfb-f08039008c7f"
+      }
+    }
+  }
+}
