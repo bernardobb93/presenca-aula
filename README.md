@@ -102,3 +102,5 @@ Para impedir que políticas antigas continuem liberando acesso por serem combina
 
 ## Correção Anexos
 
+## Atualizações
+
