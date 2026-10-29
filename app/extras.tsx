@@ -28,10 +28,52 @@ export default function Extras() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadingRecord, setLoadingRecord] = useState(false);
+  const [schoolRole, setSchoolRole] = useState('');
+  const [assignedDisciplines, setAssignedDisciplines] = useState<string[]>([]);
+  const [selectedDiscipline, setSelectedDiscipline] = useState('');
+  const [assignedTeacherName, setAssignedTeacherName] = useState('');
 
-  // Disciplina e professor são sempre derivados da turma cadastrada.
-  const discipline = turma?.subject || '';
-  const teacher = turma?.teacher || '';
+  // Professores veem apenas as disciplinas explicitamente atribuídas a eles nesta turma.
+  const discipline = schoolRole === 'professor'
+    ? (assignedDisciplines.includes(selectedDiscipline) ? selectedDiscipline : assignedDisciplines[0] || '')
+    : (turma?.subject || '');
+  const teacher = schoolRole === 'professor' ? (assignedTeacherName || turma?.teacher || '') : (turma?.teacher || '');
+
+  useEffect(() => {
+    let alive = true;
+    async function loadAssignedDiscipline() {
+      setAssignedDisciplines([]); setSelectedDiscipline(''); setAssignedTeacherName(''); setSchoolRole('');
+      if (!classId || !activeSchoolId || !online || !supabaseConfigured) return;
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        if (!user) return;
+        const { data: membership, error: membershipError } = await supabase.from('school_members').select('role').eq('school_id', activeSchoolId).eq('user_id', user.id).maybeSingle();
+        if (membershipError) throw membershipError;
+        if (!alive) return;
+        const role = membership?.role || '';
+        setSchoolRole(role);
+        if (role !== 'professor') return;
+        const { data: subjects, error: subjectsError } = await supabase.from('class_subjects').select('id,name').eq('school_id', activeSchoolId).eq('class_id', classId).order('name');
+        if (subjectsError) throw subjectsError;
+        const subjectRows = subjects || [];
+        if (!subjectRows.length) { setAssignedDisciplines([]); return; }
+        const { data: assignments, error: assignmentsError } = await supabase.from('class_subject_teachers').select('class_subject_id').eq('school_id', activeSchoolId).eq('user_id', user.id).in('class_subject_id', subjectRows.map((x: any) => x.id));
+        if (assignmentsError) throw assignmentsError;
+        const assignedIds = new Set((assignments || []).map((x: any) => x.class_subject_id));
+        const names = subjectRows.filter((x: any) => assignedIds.has(x.id)).map((x: any) => String(x.name));
+        if (!alive) return;
+        setAssignedDisciplines(names);
+        setSelectedDiscipline(names[0] || '');
+        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+        if (alive && profile?.full_name) setAssignedTeacherName(profile.full_name);
+      } catch (e: any) {
+        if (alive) { setAssignedDisciplines([]); setSelectedDiscipline(''); notify('Erro ao verificar disciplina atribuída', e.message || String(e)); }
+      }
+    }
+    loadAssignedDiscipline();
+    return () => { alive = false; };
+  }, [classId, activeSchoolId, online]);
   const updateEntry = (id: string, field: 'date' | 'objective', value: string) => setEntries(old => old.map(e => e.id === id ? { ...e, [field]: value } : e));
 
   useEffect(() => {
@@ -58,6 +100,7 @@ export default function Extras() {
 
   const saveForClass = async () => {
     if (!classId || !turma) return notify('Selecione uma turma', 'Escolha a turma onde este registro de Extras ficará salvo.');
+    if (schoolRole === 'professor' && (!discipline || !assignedDisciplines.includes(discipline))) return notify('Disciplina não atribuída', 'Você só pode registrar Extras para uma disciplina atribuída a você nesta turma. Peça ao administrador para conferir a atribuição em Gestão da escola.');
     if (!activeSchoolId) return notify('Escola não selecionada', 'Selecione uma escola antes de salvar.');
     if (!online || !supabaseConfigured) return notify('Conexão necessária', 'Para salvar os Extras permanentemente na turma, conecte-se ao Supabase.');
     setSaving(true);
@@ -235,14 +278,14 @@ export default function Extras() {
         </View>
         <View style={s.rightBlock}><Text style={s.fieldLabel}>Etapa de ensino</Text><View style={s.levelOptions}>{['Ensino Fundamental','Ensino Médio'].map(level=><TouchableOpacity key={level} onPress={()=>setEducationLevel(level)} style={[s.levelChip,educationLevel===level&&s.levelChipActive]}><Text style={[s.levelText,educationLevel===level&&s.levelTextActive]}>{level}</Text></TouchableOpacity>)}</View><Text style={s.infoInput}>Disciplina: {discipline || '—'}</Text><TextInput value={hours} onChangeText={setHours} style={s.infoInput} placeholder="Horas aula: ______"/><Text style={s.infoInput}>Professor: {teacher || '—'}</Text></View>
       </View>
-      <View testID="classPicker" style={s.classPicker}><Text style={s.fieldLabel}>Turma vinculada (os dados de disciplina e professor vêm do cadastro da turma)</Text><View style={s.classOptions}>{classes.map(c=><TouchableOpacity key={c.id} onPress={()=>setClassId(c.id)} style={[s.classChip,classId===c.id&&s.classChipActive]}><Text style={[s.classChipText,classId===c.id&&s.classChipTextActive]}>{c.name}</Text></TouchableOpacity>)}</View>{loadingRecord&&<Text testID="loading" style={s.loading}>Carregando registro salvo...</Text>}{savedId&&<Text testID="saved" style={s.saved}>Já existe um registro salvo para esta turma. Salvar atualizará esse registro.</Text>}</View>
+      <View testID="classPicker" style={s.classPicker}><Text style={s.fieldLabel}>Turma vinculada</Text><View style={s.classOptions}>{classes.map(c=><TouchableOpacity key={c.id} onPress={()=>setClassId(c.id)} style={[s.classChip,classId===c.id&&s.classChipActive]}><Text style={[s.classChipText,classId===c.id&&s.classChipTextActive]}>{c.name}</Text></TouchableOpacity>)}</View>{schoolRole==='professor'&&<><Text style={[s.fieldLabel,{marginTop:10}]}>Disciplina atribuída a você nesta turma</Text>{assignedDisciplines.length===0?<Text style={s.loading}>Nenhuma disciplina atribuída a você nesta turma. Solicite ao administrador que faça a atribuição em Gestão da escola.</Text>:<View style={s.classOptions}>{assignedDisciplines.map(name=><TouchableOpacity key={name} onPress={()=>setSelectedDiscipline(name)} style={[s.classChip,discipline===name&&s.classChipActive]}><Text style={[s.classChipText,discipline===name&&s.classChipTextActive]}>{name}</Text></TouchableOpacity>)}</View>}</>}{loadingRecord&&<Text testID="loading" style={s.loading}>Carregando registro salvo...</Text>}{savedId&&<Text testID="saved" style={s.saved}>Já existe um registro salvo para esta turma. Salvar atualizará esse registro.</Text>}</View>
       <View testID="table" style={s.table}><View testID="tableHead" style={s.tableHead}><Text style={[s.dateCol,s.headText]}>Data</Text><Text style={[s.objectiveCol,s.headText]}>Objetivos Desenvolvidos</Text></View>
         {entries.map((entry,index)=><View key={entry.id} testID="tableRow" style={[s.tableRow,index%2===1&&s.altRow]}><TextInput testID="dateCell" value={entry.date} onChangeText={v=>updateEntry(entry.id,'date',v)} placeholder="DD-MM-AAAA" style={s.dateCell}/><TextInput testID="objectiveCell" value={entry.objective} onChangeText={v=>updateEntry(entry.id,'objective',v)} style={s.objectiveCell} multiline/></View>)}
       </View>
       <TouchableOpacity testID="addRow" style={s.addRow} onPress={()=>setEntries(old=>[...old,makeEntry()])}><Ionicons name="add-circle-outline" size={18} color="#0F766E"/><Text style={s.addRowText}>Adicionar linha</Text></TouchableOpacity>
       <View testID="footer" style={s.footer}><TextInput value={signatureDate} onChangeText={setSignatureDate} style={s.footerDate} placeholder="DATA: ____/____/________"/><View style={s.signature}><Text>Assinatura Professor(a): {teacher}</Text><View style={s.line}/></View><View style={s.signature}><Text>Visto Coordenador(a) Pedagógico(a):</Text><View style={s.line}/></View></View>
     </View>
-    <Text testID="hint" style={s.hint}>Selecione a turma e preencha os campos. Disciplina e professor são puxados do cadastro da turma. Use “Salvar na turma” para guardar o formulário e recuperá-lo depois. Também é possível imprimir ou salvar como PDF.</Text>
+    <Text testID="hint" style={s.hint}>Selecione a turma. Para professores, a disciplina exibida é somente aquela atribuída ao seu usuário em Gestão da escola. Use “Salvar na turma” para guardar o formulário e recuperá-lo depois. Também é possível imprimir ou salvar como PDF.</Text>
   </ScrollView>;
 }
 const s=StyleSheet.create({page:{flex:1,backgroundColor:'#EEF2F6'},content:{padding:18,paddingBottom:40,maxWidth:1400,width:'100%',alignSelf:'center'},actions:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'},actionRight:{flexDirection:'row',gap:8,flexWrap:'wrap'},backBtn:{flexDirection:'row',gap:6,alignItems:'center',padding:10},backText:{color:'#0F766E',fontWeight:'800'},printBtn:{flexDirection:'row',alignItems:'center',gap:8,backgroundColor:'#334155',paddingVertical:10,paddingHorizontal:14,borderRadius:9},saveBtn:{flexDirection:'row',alignItems:'center',gap:8,backgroundColor:'#0F766E',paddingVertical:10,paddingHorizontal:14,borderRadius:9},printText:{color:'#FFF',fontWeight:'800'},paper:{backgroundColor:'#FFF',padding:22,borderWidth:1,borderColor:'#CBD5E1',minWidth:0},schoolHeader:{flexDirection:'row',gap:12,justifyContent:'space-between',paddingBottom:12,borderBottomWidth:1,borderColor:'#94A3B8',flexWrap:'wrap'},schoolBlock:{flex:1.1,minWidth:160},metaBlock:{flex:1.1,minWidth:230,gap:5},rightBlock:{flex:1,minWidth:190},schoolTitle:{fontWeight:'800',fontSize:12,color:'#1E293B',paddingVertical:2},address:{fontSize:11,paddingVertical:2,color:'#475569'},inline:{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:3},metaLabel:{fontSize:11,color:'#334155'},metaInput:{minWidth:45,maxWidth:110,fontSize:11,padding:2,borderBottomWidth:0.5,borderColor:'#CBD5E1',color:'#0F172A'},dateInput:{width:76,fontSize:10,padding:2,borderBottomWidth:0.5,borderColor:'#CBD5E1'},fieldLabel:{fontSize:11,fontWeight:'800',color:'#475569',marginBottom:5},levelOptions:{flexDirection:'row',flexWrap:'wrap',gap:4,marginBottom:6},levelChip:{borderWidth:1,borderColor:'#CBD5E1',borderRadius:5,paddingVertical:4,paddingHorizontal:6,backgroundColor:'#F8FAFC'},levelChipActive:{borderColor:'#0F766E',backgroundColor:'#D1FAE5'},levelText:{fontSize:10,color:'#334155'},levelTextActive:{fontWeight:'800',color:'#065F46'},infoInput:{fontSize:11,paddingVertical:4,borderBottomWidth:0.5,borderColor:'#CBD5E1',color:'#0F172A'},classPicker:{paddingVertical:10},classOptions:{flexDirection:'row',flexWrap:'wrap',gap:5},classChip:{paddingVertical:5,paddingHorizontal:9,borderRadius:6,backgroundColor:'#F1F5F9',borderWidth:1,borderColor:'#CBD5E1'},classChipActive:{backgroundColor:'#D1FAE5',borderColor:'#0F766E'},classChipText:{fontSize:11,color:'#334155'},classChipTextActive:{fontWeight:'800',color:'#065F46'},loading:{fontSize:11,color:'#64748B',marginTop:6},saved:{fontSize:11,color:'#047857',marginTop:6},table:{borderTopWidth:1,borderLeftWidth:1,borderColor:'#64748B'},tableHead:{flexDirection:'row',minHeight:27,borderBottomWidth:1,borderColor:'#64748B',backgroundColor:'#F8FAFC'},dateCol:{width:75,borderRightWidth:1,borderColor:'#64748B',textAlign:'center'},objectiveCol:{flex:1,textAlign:'center'},headText:{fontSize:11,fontWeight:'700',color:'#334155',paddingVertical:6},tableRow:{flexDirection:'row',minHeight:27,borderBottomWidth:1,borderColor:'#94A3B8'},altRow:{backgroundColor:'#FCFDFE'},dateCell:{width:75,borderRightWidth:1,borderColor:'#64748B',fontSize:10,paddingHorizontal:4,paddingVertical:2},objectiveCell:{flex:1,fontSize:11,paddingHorizontal:6,paddingVertical:2,minHeight:26,textAlignVertical:'center'},addRow:{flexDirection:'row',alignItems:'center',gap:5,alignSelf:'flex-start',paddingVertical:10},addRowText:{color:'#0F766E',fontWeight:'800',fontSize:12},footer:{flexDirection:'row',alignItems:'flex-end',justifyContent:'space-between',gap:16,marginTop:22,flexWrap:'wrap'},footerDate:{fontSize:11,minWidth:180},signature:{flex:1,minWidth:180,gap:12},line:{height:1,backgroundColor:'#475569'},hint:{fontSize:12,color:'#64748B',marginTop:12,lineHeight:18}});
