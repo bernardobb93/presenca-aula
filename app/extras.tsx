@@ -106,17 +106,120 @@ export default function Extras() {
     return () => { tag?.remove(); };
   }, []);
 
+
   const printForm = () => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const previousTitle = document.title;
-      const safeClass = (turma?.name || 'turma').replace(/[^a-z0-9_-]+/gi, '_');
-      document.title = `Registro_de_Objetivos_${safeClass}_${year}`;
-      const restore = () => { document.title = previousTitle; window.removeEventListener('afterprint', restore); };
-      window.addEventListener('afterprint', restore);
-      window.print();
-      window.setTimeout(restore, 1500);
-    } else Alert.alert('Impressão', 'Abra esta tela pelo navegador para imprimir ou salvar como PDF.');
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      Alert.alert('Impressão', 'Abra esta tela pelo navegador para imprimir ou salvar como PDF.');
+      return;
+    }
+
+    // Abre um documento exclusivo para impressão. Isso evita imprimir a tela do aplicativo
+    // (com scroll, controles e estilos do React Native Web) em vez do formulário escolar.
+    const popup = window.open('', '_blank');
+    if (!popup) {
+      window.alert('O navegador bloqueou a janela de impressão. Permita pop-ups para este site e tente novamente.');
+      return;
+    }
+
+    const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch] as string));
+    const fmtDate = (value: string) => {
+      if (!value) return '';
+      const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+      return value;
+    };
+    const rows = entries.map((entry, index) => `
+      <tr>
+        <td class="date">${esc(fmtDate(entry.date))}</td>
+        <td class="objective">${esc(entry.objective).replace(/\n/g, '<br>')}</td>
+      </tr>`).join('');
+    const periodText = [fmtDate(start), fmtDate(end)].filter(Boolean).join(' a ');
+    const title = `Registro de objetivos - ${turma?.name || 'Turma'} - ${year}`;
+    popup.document.open();
+    popup.document.write(`<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm 12mm 14mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; color: #172033; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 10pt; }
+  .sheet { width: 100%; }
+  .topline { height: 5px; background: #0f766e; margin-bottom: 15px; }
+  header { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 18px; align-items: start; border-bottom: 2px solid #0f766e; padding-bottom: 12px; margin-bottom: 14px; }
+  .eyebrow { color: #0f766e; font-size: 8pt; text-transform: uppercase; letter-spacing: 1.1px; font-weight: 700; margin-bottom: 5px; }
+  h1 { font-size: 17pt; line-height: 1.2; margin: 0 0 5px; color: #102a43; }
+  .school { font-size: 11pt; font-weight: 700; margin-bottom: 5px; overflow-wrap: anywhere; }
+  .subtitle { color: #526273; font-size: 9pt; }
+  .meta { display: grid; gap: 7px; }
+  .meta-item { border-bottom: 1px solid #d6dee7; padding-bottom: 4px; min-height: 23px; }
+  .label { color: #617184; font-size: 8pt; text-transform: uppercase; letter-spacing: .4px; display: block; margin-bottom: 2px; }
+  .value { font-weight: 600; min-height: 12px; overflow-wrap: anywhere; }
+  .section-title { font-size: 10pt; font-weight: 700; color: #102a43; margin: 14px 0 7px; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  th { background: #eaf2f5; color: #153b4a; text-align: left; font-size: 9pt; padding: 8px 9px; border: 1px solid #aebec8; }
+  td { border: 1px solid #c5d0d8; padding: 6px 9px; vertical-align: top; min-height: 24px; }
+  tbody tr:nth-child(even) { background: #f8fafb; }
+  th:first-child, td.date { width: 27mm; }
+  td.date { font-weight: 600; white-space: nowrap; }
+  td.objective { white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+  .empty { text-align: center; color: #718096; padding: 14px; }
+  .footmeta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 13px; }
+  .footmeta > div { border: 1px solid #d5dee5; border-radius: 4px; padding: 7px 9px; min-height: 40px; }
+  .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 35px; margin-top: 35px; break-inside: avoid; page-break-inside: avoid; }
+  .signature { text-align: center; padding-top: 8px; }
+  .signature .line { border-top: 1px solid #34495e; margin-bottom: 6px; }
+  .signature .name { font-size: 9pt; font-weight: 600; }
+  .signature .role { font-size: 8pt; color: #526273; margin-top: 3px; }
+  footer { margin-top: 18px; border-top: 1px solid #d8e0e7; padding-top: 6px; color: #718096; font-size: 8pt; display: flex; justify-content: space-between; }
+  @media screen { body { background: #e8edf1; padding: 20px; } .sheet { max-width: 1100px; margin: 0 auto; background: #fff; padding: 18px; box-shadow: 0 3px 15px #0001; } .printbar { max-width: 1100px; margin: 0 auto 12px; text-align: right; } .printbar button { background: #0f766e; color: white; border: 0; padding: 10px 16px; border-radius: 6px; font-weight: 700; cursor: pointer; } }
+  @media print { .printbar { display: none; } }
+</style>
+</head>
+<body>
+<div class="printbar"><button onclick="window.print()">Imprimir / Salvar como PDF</button></div>
+<main class="sheet">
+<div class="topline"></div>
+<header>
+  <section><div class="eyebrow">Documento pedagógico</div><div class="school">${esc(schoolName || 'Nome da escola')}</div><h1>Registro de objetivos desenvolvidos</h1><div class="subtitle">Planejamento e acompanhamento das atividades escolares</div></section>
+  <section class="meta">
+    <div class="meta-item"><span class="label">Turma</span><div class="value">${esc(turma?.name || 'Não selecionada')}</div></div>
+    <div class="meta-item"><span class="label">Disciplina</span><div class="value">${esc(discipline || '—')}</div></div>
+    <div class="meta-item"><span class="label">Professor(a)</span><div class="value">${esc(teacher || '—')}</div></div>
+  </section>
+  <section class="meta">
+    <div class="meta-item"><span class="label">Ano letivo / ano escolar</span><div class="value">${esc(year)} · ${esc(grade)}</div></div>
+    <div class="meta-item"><span class="label">Etapa de ensino / turno</span><div class="value">${esc(educationLevel)} · ${esc(shift || '—')}</div></div>
+    <div class="meta-item"><span class="label">Período</span><div class="value">${esc(periodText || '—')}</div></div>
+  </section>
+</header>
+<div class="section-title">Registro cronológico</div>
+<table>
+<thead><tr><th>Data</th><th>Objetivos desenvolvidos</th></tr></thead>
+<tbody>${rows || '<tr><td colspan="2" class="empty">Nenhum objetivo registrado.</td></tr>'}</tbody>
+</table>
+<div class="footmeta">
+  <div><span class="label">Carga horária</span><div class="value">${esc(hours || 'Não informada')}</div></div>
+  <div><span class="label">Data de assinatura</span><div class="value">${esc(fmtDate(signatureDate) || '____-____-________')}</div></div>
+  <div><span class="label">Emissão</span><div class="value">${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}</div></div>
+</div>
+<div class="signatures">
+  <div class="signature"><div class="line"></div><div class="name">${esc(teacher || 'Professor(a)')}</div><div class="role">Assinatura do(a) professor(a)</div></div>
+  <div class="signature"><div class="line"></div><div class="name">Coordenação pedagógica</div><div class="role">Visto / assinatura</div></div>
+</div>
+<footer><span>${esc(schoolName || 'Gestão Escolar')}</span><span>Registro de objetivos desenvolvidos</span></footer>
+</main>
+<script>window.addEventListener('load', () => { setTimeout(() => { window.focus(); window.print(); }, 300); });</script>
+</body></html>`);
+    popup.document.close();
   };
+
   return <ScrollView style={s.page} contentContainerStyle={s.content}>
     <View testID="actions" style={s.actions}>
       <TouchableOpacity style={s.backBtn} onPress={() => router.back()}><Ionicons name="arrow-back" size={18} color="#0F766E"/><Text style={s.backText}>Voltar</Text></TouchableOpacity>
