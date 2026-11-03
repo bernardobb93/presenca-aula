@@ -19,7 +19,7 @@ const tiles = [
 ];
 
 export default function Home() {
-  const { classes, lessons, attendance, online, loading, schools, activeSchoolId, switchSchool } = useApp();
+  const { classes, lessons, attendance, online, loading } = useApp();
   const [signingOut, setSigningOut] = React.useState(false);
   const { width } = useWindowDimensions();
   const columns = width >= 1050 ? 4 : width >= 650 ? 3 : 2;
@@ -43,14 +43,14 @@ export default function Home() {
   };
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={s.content}>
-      <View style={s.topbar}>
-        <View style={s.brandMark}><Ionicons name="school" size={27} color="#FFFFFF" /></View>
+    <ScrollView style={s.container} contentContainerStyle={[s.content, width < 600 && { padding: 12, paddingTop: 14, paddingBottom: 28 }]} >
+      <View style={[s.topbar, width < 600 && { padding: 13, gap: 9, flexWrap: 'wrap', marginBottom: 18 }]}>
+        <View style={[s.brandMark, width < 600 && { width: 42, height: 42 }]} ><Ionicons name="school" size={27} color="#FFFFFF" /></View>
         <View style={s.brandText}>
           <Text style={s.title}>Gestão Escolar</Text>
-          <Text style={s.subtitle}>Organize suas turmas em um só lugar</Text>
+          <Text style={[s.subtitle, width < 600 && { fontSize: 12 }]}>Organize suas turmas em um só lugar</Text>
         </View>
-        <View style={s.headerActions}>
+        <View style={[s.headerActions, width < 600 && { flexDirection: 'row', alignItems: 'center', marginLeft: 'auto' }]}>
           <View style={[s.connection, online ? s.online : s.offline]}>
             <View style={[s.dot, online ? s.dotOnline : s.dotOffline]} />
             <Text style={s.connectionText}>{loading ? 'Carregando' : online ? 'Sincronizado' : 'Modo local'}</Text>
@@ -66,9 +66,7 @@ export default function Home() {
         <Text style={s.welcomeTitle}>Painel escolar</Text>
         <Text style={s.welcomeText}>Gerencie turmas, professores e registros da sua escola.</Text>
       </View>
-      {schools.length > 1 ? <View style={s.schoolSwitcher}><Text style={s.schoolSwitcherLabel}>ESCOLA ATUAL</Text><View style={s.schoolOptions}>{schools.map(school => <TouchableOpacity key={school.id} style={[s.schoolOption, activeSchoolId===school.id && s.schoolOptionActive]} onPress={() => switchSchool(school.id)}><Text style={[s.schoolOptionText, activeSchoolId===school.id && s.schoolOptionTextActive]}>{school.name}</Text></TouchableOpacity>)}</View><Text style={s.schoolSwitcherHint}>Escolha a escola para ver somente os dados dela.</Text></View> : null}
-
-      <View style={s.stats}>
+      <View style={[s.stats, width < 600 && { gap: 7, marginBottom: 20 }]} >
         <Stat icon="people" label="Turmas" value={classes.length} color="#3B6F9C" />
         <Stat icon="book" label="Aulas / planos" value={lessons.length} color="#B66A35" />
         <Stat icon="alert-circle" label="Chamadas pendentes" value={pending} color="#9B5DB5" />
@@ -110,8 +108,7 @@ const s = StyleSheet.create({
   headerActions: { alignItems: 'flex-end', gap: 8 }, logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#075985', borderWidth: 1, borderColor: '#FFFFFF55' }, logoutText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   connection: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 20 }, online: { backgroundColor: '#D8F7E7' }, offline: { backgroundColor: '#FFF0D7' }, dot: { width: 8, height: 8, borderRadius: 4 }, dotOnline: { backgroundColor: '#15803D' }, dotOffline: { backgroundColor: '#B7791F' }, connectionText: { fontSize: 12, fontWeight: '700', color: '#243447' },
   welcome: { marginBottom: 18 }, welcomeTitle: { fontSize: 23, fontWeight: '800', color: '#182536' }, welcomeText: { color: '#64748B', fontSize: 14, marginTop: 5 },
-  schoolSwitcher:{backgroundColor:'#FFFFFF',borderRadius:14,padding:14,marginBottom:18,borderWidth:1,borderColor:'#DCE5EF'},schoolSwitcherLabel:{fontSize:11,fontWeight:'900',letterSpacing:1,color:'#64748B',marginBottom:9},schoolOptions:{flexDirection:'row',flexWrap:'wrap',gap:8},schoolOption:{paddingVertical:8,paddingHorizontal:12,borderRadius:10,backgroundColor:'#F1F5F9',borderWidth:1,borderColor:'#CBD5E1'},schoolOptionActive:{backgroundColor:'#0F766E',borderColor:'#0F766E'},schoolOptionText:{fontSize:13,fontWeight:'700',color:'#334155'},schoolOptionTextActive:{color:'#FFFFFF'},schoolSwitcherHint:{fontSize:11,color:'#64748B',marginTop:8},
   stats: { flexDirection: 'row', gap: 12, marginBottom: 27 }, stat: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 15, paddingVertical: 17, paddingHorizontal: 10, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' }, statValue: { fontSize: 25, fontWeight: '900', color: '#172033', marginTop: 7 }, statLabel: { fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 2 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#243447', marginBottom: 13 }, tiles: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 12 }, tile: { minHeight: 155, borderRadius: 17, padding: 16, marginBottom: 2, borderWidth: 1, borderColor: '#FFFFFFAA' }, tileIcon: { width: 46, height: 46, borderRadius: 13, backgroundColor: '#FFFFFF70', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }, tileTitle: { fontSize: 16, fontWeight: '900' }, tileDetail: { fontSize: 12, marginTop: 4, opacity: 0.88 }, tileArrow: { position: 'absolute', right: 12, top: 12, width: 27, height: 27, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#243447', marginBottom: 13 }, tiles: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 12 }, tile: { minHeight: 140, borderRadius: 17, padding: 12, marginBottom: 2, borderWidth: 1, borderColor: '#FFFFFFAA' }, tileIcon: { width: 46, height: 46, borderRadius: 13, backgroundColor: '#FFFFFF70', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }, tileTitle: { fontSize: 16, fontWeight: '900' }, tileDetail: { fontSize: 12, marginTop: 4, opacity: 0.88 }, tileArrow: { position: 'absolute', right: 12, top: 12, width: 27, height: 27, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   tip: { marginTop: 24, padding: 16, borderRadius: 15, backgroundColor: '#E5F3FB', borderWidth: 1, borderColor: '#C5E6F7', flexDirection: 'row', gap: 12, alignItems: 'flex-start' }, tipTitle: { color: '#155B82', fontSize: 14, fontWeight: '800', marginBottom: 4 }, tipText: { color: '#31576D', fontSize: 13, lineHeight: 19 },
 });
