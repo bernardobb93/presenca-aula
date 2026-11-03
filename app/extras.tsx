@@ -108,13 +108,45 @@ export default function Extras() {
 
   const printForm = () => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const previousTitle = document.title;
-      const safeClass = (turma?.name || 'turma').replace(/[^a-z0-9_-]+/gi, '_');
-      document.title = `Registro_de_Objetivos_${safeClass}_${year}`;
-      const restore = () => { document.title = previousTitle; window.removeEventListener('afterprint', restore); };
-      window.addEventListener('afterprint', restore);
-      window.print();
-      window.setTimeout(restore, 1500);
+      const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]!));
+      const rows = entries.map((entry, index) => `
+        <tr><td class="date">${escapeHtml(entry.date)}</td><td>${escapeHtml(entry.objective).replace(/\n/g, '<br>')}</td></tr>`).join('');
+      const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Registro de objetivos - ${escapeHtml(turma?.name || 'Turma')}</title>
+      <style>
+        @page { size: A4 landscape; margin: 12mm 12mm 14mm; }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: #fff; color: #111827; font-family: Arial, Helvetica, sans-serif; }
+        body { font-size: 10pt; }
+        .header { display: grid; grid-template-columns: 1.1fr 1.2fr 1fr; gap: 8mm; border-bottom: 2px solid #475569; padding-bottom: 5mm; margin-bottom: 5mm; }
+        h1 { font-size: 16pt; margin: 0 0 2mm; } .subtitle { font-size: 10pt; color: #475569; }
+        .block p { margin: 0 0 2mm; line-height: 1.35; }
+        .label { font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        thead { display: table-header-group; } tr { break-inside: avoid; page-break-inside: avoid; }
+        th, td { border: 1px solid #64748b; padding: 2mm 2.5mm; vertical-align: middle; }
+        th { background: #e9eef4; text-align: center; font-size: 10pt; }
+        td { height: 8mm; font-size: 9.5pt; white-space: pre-wrap; overflow-wrap: anywhere; }
+        td.date { width: 28mm; text-align: center; }
+        .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 22mm; margin-top: 17mm; break-inside: avoid; page-break-inside: avoid; }
+        .signature { text-align: center; padding-top: 2mm; }
+        .signature .rule { border-top: 1px solid #334155; margin-bottom: 2mm; }
+        .signature .caption { font-size: 9pt; }
+        .date-sign { margin-top: 8mm; font-size: 9pt; }
+        @media screen { body { max-width: 277mm; margin: 12mm auto; padding: 10mm; box-shadow: 0 0 5mm #cbd5e1; } }
+      </style></head><body>
+        <header class="header">
+          <section class="block"><h1>${escapeHtml(schoolName || 'NOME DA ESCOLA')}</h1><div class="subtitle">Registro de objetivos desenvolvidos</div></section>
+          <section class="block"><p><span class="label">Ano:</span> ${escapeHtml(year)} &nbsp; <span class="label">Ano escolar:</span> ${escapeHtml(grade)}</p><p><span class="label">Turno:</span> ${escapeHtml(shift)} &nbsp; <span class="label">Turma:</span> ${escapeHtml(turma?.name || '')}</p><p><span class="label">Período:</span> ${escapeHtml(start)} a ${escapeHtml(end)}</p></section>
+          <section class="block"><p><span class="label">Etapa de ensino:</span> ${escapeHtml(educationLevel)}</p><p><span class="label">Disciplina:</span> ${escapeHtml(discipline || '—')}</p><p><span class="label">Horas aula:</span> ${escapeHtml(hours)}</p><p><span class="label">Professor:</span> ${escapeHtml(teacher || '—')}</p></section>
+        </header>
+        <table><thead><tr><th style="width:28mm">Data</th><th>Objetivos Desenvolvidos</th></tr></thead><tbody>${rows}</tbody></table>
+        <section class="signatures"><div><div class="rule"></div><div class="caption">Assinatura Professor(a): ${escapeHtml(teacher)}</div></div><div><div class="rule"></div><div class="caption">Visto Coordenador(a) Pedagógico(a)</div></div></section>
+        <div class="date-sign">Data: ${escapeHtml(signatureDate)}</div>
+        <script>window.addEventListener('load', () => { setTimeout(() => { window.focus(); window.print(); }, 250); });</script>
+      </body></html>`;
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) { notify('Impressão bloqueada', 'Permita pop-ups para este site e tente imprimir novamente.'); return; }
+      printWindow.document.open(); printWindow.document.write(html); printWindow.document.close();
     } else Alert.alert('Impressão', 'Abra esta tela pelo navegador para imprimir ou salvar como PDF.');
   };
   return <ScrollView style={s.page} contentContainerStyle={s.content}>
