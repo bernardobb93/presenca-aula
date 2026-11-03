@@ -113,26 +113,27 @@ export default function Extras() {
         <tr><td class="date">${escapeHtml(entry.date)}</td><td>${escapeHtml(entry.objective).replace(/\n/g, '<br>')}</td></tr>`).join('');
       const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Registro de objetivos - ${escapeHtml(turma?.name || 'Turma')}</title>
       <style>
-        @page { size: A4 landscape; margin: 12mm 12mm 14mm; }
+        @page { size: A4 landscape; margin: 7mm 8mm 8mm; }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; background: #fff; color: #111827; font-family: Arial, Helvetica, sans-serif; }
-        body { font-size: 10pt; }
-        .header { display: grid; grid-template-columns: 1.1fr 1.2fr 1fr; gap: 8mm; border-bottom: 2px solid #475569; padding-bottom: 5mm; margin-bottom: 5mm; }
-        h1 { font-size: 16pt; margin: 0 0 2mm; } .subtitle { font-size: 10pt; color: #475569; }
-        .block p { margin: 0 0 2mm; line-height: 1.35; }
+        body { font-size: 8.5pt; zoom: 0.88; }
+         .header { display: grid; grid-template-columns: 1.1fr 1.2fr 1fr; gap: 5mm; border-bottom: 1.5px solid #475569; padding-bottom: 2.5mm; margin-bottom: 2.5mm; }
+        h1 { font-size: 12pt; margin: 0 0 1mm; } .subtitle { font-size: 8pt; color: #475569; }
+        .block p { margin: 0 0 1mm; line-height: 1.15; }
         .label { font-weight: bold; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         thead { display: table-header-group; } tr { break-inside: avoid; page-break-inside: avoid; }
-        th, td { border: 1px solid #64748b; padding: 2mm 2.5mm; vertical-align: middle; }
-        th { background: #e9eef4; text-align: center; font-size: 10pt; }
-        td { height: 8mm; font-size: 9.5pt; white-space: pre-wrap; overflow-wrap: anywhere; }
+        th, td { border: 1px solid #64748b; padding: 1mm 1.5mm; vertical-align: middle; }
+        th { background: #e9eef4; text-align: center; font-size: 8pt; }
+        td { height: auto; min-height: 5mm; font-size: 8pt; line-height: 1.12; white-space: pre-wrap; overflow-wrap: anywhere; }
         td.date { width: 28mm; text-align: center; }
-        .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 22mm; margin-top: 17mm; break-inside: avoid; page-break-inside: avoid; }
-        .signature { text-align: center; padding-top: 2mm; }
+        .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 18mm; margin-top: 8mm; break-inside: avoid; page-break-inside: avoid; }
+        .signature { text-align: center; padding-top: 1mm; }
         .signature .rule { border-top: 1px solid #334155; margin-bottom: 2mm; }
         .signature .caption { font-size: 9pt; }
-        .date-sign { margin-top: 8mm; font-size: 9pt; }
-        @media screen { body { max-width: 277mm; margin: 12mm auto; padding: 10mm; box-shadow: 0 0 5mm #cbd5e1; } }
+        .date-sign { margin-top: 4mm; font-size: 8pt; }
+        @media screen { body { max-width: 277mm; margin: 12mm auto; padding: 10mm; box-shadow: 0 0 5mm #cbd5e1; zoom: 1; } }
+        @media print { html, body { width: 100%; height: auto; } body { overflow: visible; } table, thead, tbody, tr { page-break-inside: auto; } tr { break-inside: avoid; page-break-inside: avoid; } .signatures, .date-sign { break-inside: avoid; page-break-inside: avoid; } }
       </style></head><body>
         <header class="header">
           <section class="block"><h1>${escapeHtml(schoolName || 'NOME DA ESCOLA')}</h1><div class="subtitle">Registro de objetivos desenvolvidos</div></section>
