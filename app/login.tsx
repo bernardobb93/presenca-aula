@@ -8,6 +8,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [signup, setSignup] = useState(false);
+  const [forgotPassword, setForgotPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'error' | 'success' | 'info'>('info');
@@ -45,6 +46,21 @@ export default function Login() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function requestPasswordReset() {
+    setMessage('');
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) { showMessage('Informe o e-mail cadastrado para receber o link de recuperação.', 'error'); return; }
+    if (!supabaseConfigured) { showMessage('O Supabase não está configurado neste ambiente.', 'error'); return; }
+    setBusy(true);
+    try {
+      const redirectTo = Platform.OS === 'web' && typeof window !== 'undefined' ? `${window.location.origin}/redefinir-senha` : undefined;
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, { ...(redirectTo ? { redirectTo } : {}) });
+      if (error) { const raw = error.message || 'Não foi possível solicitar a recuperação.'; showMessage(raw.toLowerCase().includes('rate limit') || raw.toLowerCase().includes('too many requests') ? 'Muitas solicitações em pouco tempo. Aguarde alguns minutos e tente novamente.' : raw, 'error'); return; }
+      showMessage('Se esse e-mail estiver cadastrado, enviaremos um link para redefinir sua senha. Verifique também o spam e o lixo eletrônico.', 'success');
+    } catch (error) { showMessage(`Não foi possível solicitar a recuperação. ${error instanceof Error ? error.message : String(error)}`, 'error'); }
+    finally { setBusy(false); }
   }
 
   async function submit() {
@@ -122,8 +138,9 @@ export default function Login() {
         <View style={s.logoMark}><Text style={s.logoMarkText}>🎓</Text></View>
         <Text style={s.logo}>Gestão Escolar</Text>
         <Text style={s.subtitle}>Organize suas turmas, aulas e chamadas.</Text>
-        <Text style={s.title}>{signup ? 'Criar conta de professor' : 'Bem-vindo de volta'}</Text>
-        {signup ? <><Text style={s.label}>Nome completo do professor</Text><TextInput style={s.input} placeholder="Nome e sobrenome" placeholderTextColor="#94A3B8" autoCapitalize="words" value={fullName} onChangeText={setFullName} editable={!busy} textContentType="name" /></> : null}
+        <Text style={s.title}>{forgotPassword ? 'Recuperar senha' : signup ? 'Criar conta de professor' : 'Bem-vindo de volta'}</Text>
+        {forgotPassword ? <Text style={s.subtitle}>Informe seu e-mail e enviaremos um link para criar uma nova senha.</Text> : null}
+        {!forgotPassword && signup ? <><Text style={s.label}>Nome completo do professor</Text><TextInput style={s.input} placeholder="Nome e sobrenome" placeholderTextColor="#94A3B8" autoCapitalize="words" value={fullName} onChangeText={setFullName} editable={!busy} textContentType="name" /></> : null}
         <Text style={s.label}>E-mail</Text>
         <TextInput
           style={s.input}
@@ -136,9 +153,9 @@ export default function Login() {
           value={email}
           onChangeText={setEmail}
           editable={!busy}
-          onSubmitEditing={submit}
+          onSubmitEditing={forgotPassword ? requestPasswordReset : submit}
         />
-        <Text style={s.label}>Senha</Text>
+        {!forgotPassword ? <><Text style={s.label}>Senha</Text>
         <TextInput
           style={s.input}
           placeholder="Mínimo de 6 caracteres"
@@ -150,7 +167,7 @@ export default function Login() {
           onChangeText={setPassword}
           editable={!busy}
           onSubmitEditing={submit}
-        />
+        /></> : null}
 
         {message ? (
           <View style={[s.message, messageType === 'error' ? s.errorBox : messageType === 'success' ? s.successBox : s.infoBox]}>
@@ -158,16 +175,17 @@ export default function Login() {
           </View>
         ) : null}
 
-        <TouchableOpacity style={[s.button, busy && s.buttonDisabled]} disabled={busy} onPress={submit} accessibilityRole="button">
-          {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={s.buttonText}>{signup ? 'Criar conta' : 'Entrar'}</Text>}
+        <TouchableOpacity style={[s.button, busy && s.buttonDisabled]} disabled={busy} onPress={forgotPassword ? requestPasswordReset : submit} accessibilityRole="button">
+          {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={s.buttonText}>{forgotPassword ? 'Enviar link de recuperação' : signup ? 'Criar conta' : 'Entrar'}</Text>}
         </TouchableOpacity>
+        {!signup && !forgotPassword ? <TouchableOpacity disabled={busy} onPress={() => { setForgotPassword(true); setMessage(''); setShowResend(false); }} style={s.forgotButton}><Text style={s.forgotText}>Esqueci minha senha</Text></TouchableOpacity> : null}
         {showResend ? (
           <TouchableOpacity disabled={busy} onPress={resendConfirmation} style={s.resendButton} accessibilityRole="button">
             <Text style={s.resendText}>{busy ? 'Enviando...' : 'Reenviar e-mail de confirmação'}</Text>
           </TouchableOpacity>
         ) : null}
-        <TouchableOpacity disabled={busy} onPress={() => { setSignup(!signup); showMessage(''); setShowResend(false); setFullName(''); }} style={s.switchButton}>
-          <Text style={s.switchText}>{signup ? 'Já tenho uma conta · Entrar' : 'Primeiro acesso? Criar uma conta'}</Text>
+        <TouchableOpacity disabled={busy} onPress={() => { if (forgotPassword) setForgotPassword(false); else { setSignup(!signup); setFullName(''); } showMessage(''); setShowResend(false); }} style={s.switchButton}>
+          <Text style={s.switchText}>{forgotPassword ? 'Voltar para entrar' : signup ? 'Já tenho uma conta · Entrar' : 'Primeiro acesso? Criar uma conta'}</Text>
         </TouchableOpacity>
         {!supabaseConfigured ? (
           <Text style={s.configHint}>Configuração pendente: o arquivo .env não foi detectado neste build.</Text>
@@ -192,6 +210,8 @@ const s = StyleSheet.create({
   buttonDisabled: { opacity: 0.65 },
   buttonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
   switchButton: { paddingVertical: 17, alignItems: 'center' },
+  forgotButton: { alignItems: 'flex-end', paddingVertical: 12 },
+  forgotText: { color: '#0F766E', fontWeight: '700', fontSize: 13 },
   resendButton: { minHeight: 44, borderWidth: 1, borderColor: '#0F766E', borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, marginTop: 8 },
   resendText: { color: '#0F766E', fontWeight: '800', fontSize: 14, textAlign: 'center' },
   switchText: { color: '#0F766E', fontWeight: '700', textAlign: 'center' },
