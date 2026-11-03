@@ -11,6 +11,7 @@ const tiles = [
   { icon: 'book' as const, title: 'Planos de aula', detail: 'Conteúdos e anexos', color: '#F2A16D', ink: '#713B20', route: '/lessons' as const },
   { icon: 'document-text' as const, title: 'Histórico', detail: 'Consultar frequência', color: '#65B5E8', ink: '#174B75', route: '/history' as const },
   { icon: 'clipboard' as const, title: 'Avaliações', detail: 'Notas e médias dos alunos', color: '#C7B7F2', ink: '#49317A', route: '/evaluations' as const },
+  { icon: 'calendar' as const, title: 'Calendário', detail: 'Avaliações e datas importantes', color: '#F8B4C6', ink: '#8B2448', route: '/calendar' as const },
   { icon: 'school' as const, title: 'Boletim', detail: 'Resumo de notas e frequência', color: '#A7DCCB', ink: '#17664F', route: '/boletim' as const },
   { icon: 'document-text' as const, title: 'Extras', detail: 'Registro de objetivos desenvolvidos', color: '#F6D8A8', ink: '#7A4A12', route: '/extras' as const },
   { icon: 'business' as const, title: 'Minha escola', detail: 'Professores e permissões', color: '#DCEBFF', ink: '#244F9E', route: '/school' as const },
