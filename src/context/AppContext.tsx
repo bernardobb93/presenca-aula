@@ -33,9 +33,23 @@ export function AppProvider({children}:{children:ReactNode}){
    if(supabaseConfigured){
      const {data:{session},error:sessionError}=await supabase.auth.getSession();
      if(session?.user && !sessionError){
-       const {data: memberships, error: membershipError}=await supabase.from('school_members').select('school_id,role,schools(id,name)').eq('user_id',session.user.id).order('created_at');
-       if(membershipError){setData(empty);setOnline(true);setLoading(false);return;}
-       const schoolOptions:SchoolOption[]=(memberships||[]).map((m:any)=>({id:m.school_id,name:m.schools?.name||'Escola',role:m.role}));
+       const {data: memberships, error: membershipError}=await supabase.from('school_members').select('school_id,role').eq('user_id',session.user.id).order('created_at');
+       if(membershipError){setSchools([]);setData(empty);setOnline(true);setLoading(false);return;}
+       // Exibe somente escolas que realmente existem. Não cria opção genérica
+       // quando o vínculo aponta para uma escola inexistente ou sem cadastro.
+       const memberRows=memberships||[];
+       const schoolIds=Array.from(new Set(memberRows.map((m:any)=>m.school_id).filter(Boolean)));
+       let schoolOptions:SchoolOption[]=[];
+       if(schoolIds.length){
+         const {data: registeredSchools, error: schoolsError}=await supabase.from('schools').select('id,name').in('id',schoolIds);
+         if(schoolsError){setSchools([]);setData(empty);setOnline(true);setLoading(false);return;}
+         const registeredById=new Map((registeredSchools||[]).map((school:any)=>[school.id,school]));
+         schoolOptions=memberRows.flatMap((m:any)=>{
+           const school:any=registeredById.get(m.school_id);
+           if(!school || !String(school.name||'').trim()) return [];
+           return [{id:school.id,name:String(school.name).trim(),role:m.role}];
+         }).filter((school,index,array)=>array.findIndex(x=>x.id===school.id)===index);
+       }
        setSchools(schoolOptions);
        const savedSchool=await AsyncStorage.getItem(ACTIVE_SCHOOL_KEY);
        const chosenSchool=schoolOptions.find(x=>x.id===savedSchool)?.id || schoolOptions[0]?.id || null;
