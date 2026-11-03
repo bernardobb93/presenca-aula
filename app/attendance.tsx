@@ -12,11 +12,11 @@ const shift=(iso:string,days:number)=>{const [y,m,d]=iso.split("-").map(Number);
 
 export default function Attendance(){
  const {classes,lessons,attendance,addLesson,updateLesson,saveAttendance,schools,activeSchoolId,online}=useApp();
- const [assignedByClass,setAssignedByClass]=useState<Record<string,string[]>>({});
+ const [assignedByClass,setAssignedByClass]=useState<Record<string,{id:string;name:string}[]>>({});
  const [assignmentReady,setAssignmentReady]=useState(false);
  const role=schools.find(x=>x.id===activeSchoolId)?.role||"";
  const isTeacher=role==="professor";
- useEffect(()=>{let live=true;(async()=>{setAssignmentReady(false);if(!online||!isTeacher){setAssignedByClass({});setAssignmentReady(true);return;}const {data:{user},error:userError}=await supabase.auth.getUser();if(userError||!user){if(live)setAssignmentReady(true);return;}const {data:links,error:linkError}=await supabase.from("class_subject_teachers").select("class_subject_id").eq("school_id",activeSchoolId).eq("user_id",user.id);if(linkError)throw linkError;const subjectIds=(links||[]).map((x:any)=>x.class_subject_id).filter(Boolean);let subjectRows:any[]=[];if(subjectIds.length){const {data:rows,error:subjectError}=await supabase.from("class_subjects").select("id,class_id,name").eq("school_id",activeSchoolId).in("id",subjectIds);if(subjectError)throw subjectError;subjectRows=rows||[];}if(live){const map:Record<string,string[]>={};for(const cs of subjectRows){if(cs?.class_id&&cs?.name)(map[cs.class_id] ||= []).push(cs.name);}Object.keys(map).forEach(k=>map[k]=Array.from(new Set(map[k])));setAssignedByClass(map);setAssignmentReady(true);}})();return()=>{live=false;}},[online,isTeacher,activeSchoolId]);
+ useEffect(()=>{let live=true;(async()=>{setAssignmentReady(false);if(!online){setAssignedByClass({});setAssignmentReady(true);return;}let subjectIds:string[]=[];if(isTeacher){const {data:{user},error:userError}=await supabase.auth.getUser();if(userError||!user){if(live)setAssignmentReady(true);return;}const {data:links,error:linkError}=await supabase.from("class_subject_teachers").select("class_subject_id").eq("school_id",activeSchoolId).eq("user_id",user.id);if(linkError)throw linkError;subjectIds=(links||[]).map((x:any)=>x.class_subject_id).filter(Boolean);}let subjectQuery=supabase.from("class_subjects").select("id,class_id,name").eq("school_id",activeSchoolId);if(isTeacher&&subjectIds.length)subjectQuery=subjectQuery.in("id",subjectIds);else if(isTeacher)subjectQuery=subjectQuery.eq("id","00000000-0000-0000-0000-000000000000");const {data:subjectRows,error:subjectError}=await subjectQuery;if(subjectError)throw subjectError;if(live){const map:Record<string,{id:string;name:string}[]>={};for(const cs of subjectRows){if(cs?.class_id&&cs?.name&&cs?.id)(map[cs.class_id] ||= []).push({id:cs.id,name:cs.name});}Object.keys(map).forEach(k=>map[k]=map[k].filter((v,i,a)=>a.findIndex(x=>x.id===v.id)===i));setAssignedByClass(map);setAssignmentReady(true);}})();return()=>{live=false;}},[online,isTeacher,activeSchoolId]);
  const visibleClasses=useMemo(()=>isTeacher?classes.filter(c=>(assignedByClass[c.id]||[]).length>0):classes,[classes,isTeacher,assignedByClass]);
  const [selected,setSelected]=useState(classes[0]?.id||"");
  useEffect(()=>{if(!visibleClasses.some(c=>c.id===selected))setSelected(visibleClasses[0]?.id||"");},[visibleClasses,selected]);
@@ -24,11 +24,16 @@ export default function Attendance(){
  const [subject,setSubject]=useState("");
  const [status,setStatus]=useState<Record<string,Status>>({});
  const turma=useMemo(()=>classes.find(c=>c.id===selected),[classes,selected]);
- const subjects=useMemo(()=>isTeacher?(assignedByClass[selected]||[]):Array.from(new Set((turma?.subject||"").split(/[;,\n]/).map(x=>x.trim()).filter(Boolean))),[turma,isTeacher,assignedByClass,selected]);
+ const subjectOptions=useMemo(()=>online?(assignedByClass[selected]||[]):Array.from(new Set((turma?.subject||"").split(/[;,\n]/).map(x=>x.trim()).filter(Boolean))).map(name=>({id:"",name})),[turma,online,assignedByClass,selected]);
+ const subjects=subjectOptions.map(x=>x.name);
+ const selectedSubjectId=subjectOptions.find(x=>x.name===subject)?.id||null;
  useEffect(()=>{setSubject(subjects[0]||"");},[selected,subjects.join("|")]);
  const alunosOrdenados=useMemo(()=>[...(turma?.students||[])].sort((a,b)=>a.name.localeCompare(b.name,"pt-BR",{sensitivity:"base"})),[turma]);
  const lessonTitle=`Aula de ${subject || turma?.subject || "Disciplina"}`;
- const existing=useMemo(()=>lessons.find(l=>l.classId===selected && localDate(new Date(l.date))===date && l.title===lessonTitle),[lessons,selected,date,lessonTitle]);
+ const dayLessons=useMemo(()=>lessons.filter(l=>l.classId===selected && localDate(new Date(l.date))===date && l.title===lessonTitle).sort((a,b)=>a.date.localeCompare(b.date)),[lessons,selected,date,lessonTitle]);
+ const [selectedLessonId,setSelectedLessonId]=useState("");
+ useEffect(()=>{setSelectedLessonId(dayLessons[0]?.id||"");},[selected,date,subject]);
+ const existing=dayLessons.find(l=>l.id===selectedLessonId);
  const existingAttendance=useMemo(()=>existing?attendance.find(a=>a.lessonId===existing.id):undefined,[attendance,existing]);
 
  useEffect(()=>{
@@ -43,7 +48,8 @@ export default function Attendance(){
    if(!turma)return Alert.alert("Atenção","Cadastre uma turma primeiro.");
    if(!subject.trim())return Alert.alert("Atenção","Informe a disciplina no cadastro da turma (separe várias por vírgula). ");
    try{
-     const lesson=existing || await addLesson({classId:turma.id,date:`${date}T12:00:00`,title:lessonTitle,notes:""});
+     const lesson=existing || await addLesson({classId:turma.id,date:`${date}T12:00:00`,title:lessonTitle,notes:"",classSubjectId:selectedSubjectId});
+     if(!existing)setSelectedLessonId(lesson.id);
      if(!lesson)throw new Error("Não foi possível criar a aula.");
      if(existing) await updateLesson(existing.id,{classId:turma.id,date:existing.date,title:existing.title,notes:existing.notes||""});
      await saveAttendance(lesson.id,alunosOrdenados.map(st=>({studentId:st.id,status:status[st.id]||"present"})));
@@ -65,11 +71,12 @@ export default function Attendance(){
    <View style={s.dateBox}><TouchableOpacity onPress={()=>setDate(shift(date,-1))}><Text style={s.arrow}>‹</Text></TouchableOpacity><View><Text style={s.dateLabel}>Data da chamada</Text><Text style={s.date}>{displayDate(date)}</Text></View><TouchableOpacity onPress={()=>setDate(shift(date,1))}><Text style={s.arrow}>›</Text></TouchableOpacity></View>
    <TouchableOpacity style={s.today} onPress={()=>setDate(localDate())}><Text style={s.todayText}>Hoje</Text></TouchableOpacity>
    <View style={s.summary}><View><Text style={s.sumValue}>{alunosOrdenados.length}</Text><Text style={s.sumLabel}>Alunos</Text></View><View><Text style={s.sumValue}>{present}</Text><Text style={s.sumLabel}>Presentes</Text></View><View><Text style={s.sumValue}>{absent}</Text><Text style={s.sumLabel}>Faltas</Text></View><View><Text style={s.sumValue}>{justified}</Text><Text style={s.sumLabel}>Just.</Text></View></View>
-   {existing&&<Text style={s.saved}>✓ Chamada já registrada neste dia. Você pode alterar e salvar novamente.</Text>}
+   {dayLessons.length>0&&<><Text style={s.label}>Aulas registradas neste dia</Text><ScrollView horizontal showsHorizontalScrollIndicator={false}>{dayLessons.map((l,i)=><TouchableOpacity key={l.id} style={[s.chip,selectedLessonId===l.id&&s.chipOn]} onPress={()=>setSelectedLessonId(l.id)}><Text style={[s.chipText,selectedLessonId===l.id&&s.chipTextOn]}>Aula {i+1}</Text></TouchableOpacity>)}</ScrollView><Text style={s.saved}>Cada aula possui uma chamada independente. Selecione uma para consultar ou editar.</Text></>}
    <Text style={s.label}>Alunos</Text>
    {!alunosOrdenados.length&&<Text style={s.text}>A turma ainda não possui alunos cadastrados.</Text>}
    {alunosOrdenados.map(st=><View style={s.student} key={st.id}><Text style={s.studentName}>{st.name}</Text><View style={s.statusRow}>{(["present","absent","justified"] as Status[]).map(x=><TouchableOpacity key={x} style={[s.status,x==="present"?s.green:x==="absent"?s.red:s.yellow,status[st.id]===x&&s.selected]} onPress={()=>setStatus({...status,[st.id]:x})}><Text>{x==="present"?"P":x==="absent"?"F":"J"}</Text></TouchableOpacity>)}</View></View>)}
-   <TouchableOpacity disabled={isTeacher&&subjects.length===0} style={[s.button,isTeacher&&subjects.length===0&&{opacity:0.45}]} onPress={finish}><Text style={s.bt}>{existing?"Atualizar chamada":"Salvar chamada"}</Text></TouchableOpacity>
+   <TouchableOpacity disabled={isTeacher&&subjects.length===0} style={[s.button,isTeacher&&subjects.length===0&&{opacity:0.45}]} onPress={finish}><Text style={s.bt}>{existing?"Atualizar chamada":"Salvar nova chamada"}</Text></TouchableOpacity>
+   {dayLessons.length>0&&<TouchableOpacity style={s.secondary} onPress={()=>setSelectedLessonId("")}><Text style={s.secondaryText}>＋ Adicionar outra aula desta disciplina</Text></TouchableOpacity>}
    <TouchableOpacity style={s.secondary} onPress={()=>router.push({pathname:"/history",params:{classId:selected}})}><Text style={s.secondaryText}>Ver histórico de frequência</Text></TouchableOpacity>
  </ScrollView>
 }

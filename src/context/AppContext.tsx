@@ -66,7 +66,7 @@ export function AppProvider({children}:{children:ReactNode}){
        if(!err){
          const students=(sr.data||[]).map(toStudent);
          const classes=(cr.data||[]).map((x:any)=>toClass(x,students.filter(s=>s.class_id===x.id)));
-         const lessons=(lr.data||[]).map((x:any)=>({id:x.id,user_id:x.user_id,classId:x.class_id,date:x.date,title:x.title,notes:x.notes||'',attachment_name:x.attachment_name,attachment_path:x.attachment_path||null}));
+         const lessons=(lr.data||[]).map((x:any)=>({id:x.id,user_id:x.user_id,classId:x.class_id,date:x.date,title:x.title,notes:x.notes||'',attachment_name:x.attachment_name,attachment_path:x.attachment_path||null,classSubjectId:x.class_subject_id||null}));
          const attendance=(ar.data||[]).map((x:any)=>({lessonId:x.lesson_id,items:x.items||[]}));
          setData({classes,lessons,attendance}); setOnline(true); setLoading(false); return;
        }
